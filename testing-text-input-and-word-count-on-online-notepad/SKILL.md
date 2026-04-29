@@ -1,18 +1,18 @@
 ---
 name: testing-text-input-and-word-count-on-online-notepad
 description: "Testing Text Input and Word Count on Online Notepad in Google Chrome. Generated from live Screenpipe capture."
-version: 1.0.0
+version: 2.0.0
 read_when:
   - "Testing Text Input and Word Count on Online Notepad"
   - "Google Chrome workflow"
-  - "Google Chrome training"
-metadata: {"openclaw":{"emoji":"🎬"}}
+  - "Browser testing workflow"
+metadata: {"hermes":{"emoji":"🎬"}}
 allowed-tools: browser(*)
 ---
 
 # Testing Text Input and Word Count on Online Notepad
 
-- **Application**: Google Chrome
+- **Application**: Browser (Hermes MCP)
 - **URL Pattern**: `onlinenotepad.org/notepad`
 - **Login Required**: No
 
@@ -23,9 +23,8 @@ The user transfers text from a local Notepad application to an online notepad to
 ## Setup
 
 ```
-openclaw browser open "onlinenotepad.org/notepad"
-openclaw browser wait --load networkidle
-openclaw browser snapshot --interactive
+mcp_browser_navigate(url="https://onlinenotepad.org/notepad")
+mcp_browser_snapshot(full=false)  # Get interactive elements
 ```
 
 ## Steps
@@ -38,36 +37,36 @@ openclaw browser snapshot --interactive
 
 **Execute**:
 ```
-openclaw browser open "https://onlinenotepad.org/notepad"
-openclaw browser wait --load networkidle
-openclaw browser snapshot --interactive  # Refresh refs
+mcp_browser_navigate(url="https://onlinenotepad.org/notepad")
+mcp_browser_snapshot(full=false)  # Refresh refs
 ```
 
-**Verify**: The Online Notepad website loads, potentially showing a full-screen ad (vignette).
+**Verify**: The Online Notepad website loads, potentially showing a consent dialog.
 
 **Visual Reference**: `references/frames/step_1.jpg`
 
-**If it fails**: Page fails to load or the ad blocks interaction.
+**If it fails**: Page fails to load or a consent dialog blocks interaction.
 
 ---
 
-### 2. CLICK: Close
+### 2. ACCEPT CONSENT (if dialog appears)
 
-> *Dismiss the full-screen advertisement to access the notepad interface.*
+> *Dismiss the consent dialog to access the notepad interface.*
 
-**Why**: The ad prevents interaction with the main web application.
+**Why**: The consent dialog prevents interaction with the main web application.
 
 **Execute**:
 ```
-openclaw browser find role button --name "Close" click
-# Fallback: openclaw browser snapshot --interactive
+# Look for any accept/agree button in the snapshot
+# If dialog present, click the primary action button (e.g. "Accept" or "Agree")
+# If no explicit button, try pressing Enter to accept defaults
+mcp_browser_press(key="Enter")
+mcp_browser_snapshot(full=false)  # Refresh after dismiss attempt
 ```
 
-**Verify**: The ad disappears, revealing the notepad editor.
+**Verify**: The dialog disappears, revealing the notepad editor.
 
-**Visual Reference**: `references/frames/step_2.jpg`
-
-**If it fails**: Clicking the ad might open the advertiser's page instead of closing it.
+**If it fails**: Try clicking directly in the main content area, or navigate again.
 
 ---
 
@@ -79,13 +78,13 @@ openclaw browser find role button --name "Close" click
 
 **Execute**:
 ```
-openclaw browser key "Control+V"
-# Fallback: openclaw browser snapshot --interactive
+mcp_browser_press(key="Control+V")
+mcp_browser_snapshot(full=false)  # Check result
 ```
 
-**Verify**: Multiple lines containing the word 'test' appear in the editor, and the word count updates to 45.
+**Verify**: Multiple lines containing the word 'test' appear in the editor, and the word count updates.
 
-**If it fails**: Clipboard is empty or paste fails due to browser permissions.
+**If it fails**: Clipboard is empty or paste fails due to browser permissions. Try manually typing instead.
 
 ---
 
@@ -97,13 +96,12 @@ openclaw browser key "Control+V"
 
 **Execute**:
 ```
-openclaw browser key "Control+A"
-# Fallback: openclaw browser snapshot --interactive
+mcp_browser_press(key="Control+A")
 ```
 
 **Verify**: All text in the document is highlighted.
 
-**If it fails**: Focus is not on the text editor.
+**If it fails**: Focus is not on the text editor. Click on the editor area first.
 
 ---
 
@@ -115,44 +113,66 @@ openclaw browser key "Control+A"
 
 **Execute**:
 ```
-openclaw browser key "Backspace"
-# Fallback: openclaw browser snapshot --interactive
+mcp_browser_press(key="Backspace")
+mcp_browser_snapshot(full=false)  # Verify word count resets
 ```
 
 **Verify**: The editor is empty and the word count resets to 0.
 
+**If it fails**: Try clicking in editor first to ensure focus.
+
 ---
 
-### 6. TYPE: Online Notepad
+### 6. TYPE: test
 
-> *Type the word 'test' repeatedly on multiple lines.*
+> *Type the word 'test' in the editor.*
 
 **Why**: To test the real-time word counter and autosave functionality.
 
 **Execute**:
 ```
-openclaw browser find role textbox --name "Online Notepad" fill "test"
-# Fallback: openclaw browser snapshot --interactive
+# First locate the textbox in the snapshot - look for iframe or textbox element
+# Click on it to focus, then type
+mcp_browser_click(ref="@e{N}")  # Use the ref from snapshot for the editor/textbox
+mcp_browser_type(ref="@e{N}", text="test")
 ```
 
-**Verify**: The words appear in the document and the word count updates incrementally from 12 to 19.
+**Alternative** (if textbox not clearly identifiable):
+```
+# Use keyboard to type directly if editor area is focused
+mcp_browser_type(ref="@e{N}", text="test")
+```
+
+**Verify**: The word appears in the document and the word count updates.
 
 **Visual Reference**: `references/frames/step_6.jpg`
 
-**If it fails**: Network issues might slow down the autosave feedback.
+**If it fails**: Try pressing Tab to focus the editor, then type directly.
 
 ---
 
 ## Decision Points
 
-- **Step 2**: Handling the Google Vignette ad → If a grayed-out screen with an ad appears immediately after navigation, look for a 'Close' or 'X' button to reveal the notepad.
+- **Step 2**: Consent dialog handling → If a consent dialog appears, try pressing Enter first (accepts defaults). If that doesn't work, look for an "Accept" or "Agree" button in the snapshot and click it.
+- **Step 6**: If the textbox ref is not identifiable in the snapshot, try clicking on the main content area (often inside an iframe) to focus it before typing.
 
-## Agent Replay Tips
+## Hermes Browser Tool Reference
 
-1. Always `openclaw browser snapshot --interactive` after navigation to get fresh refs
-2. Refs change on every page load — never reuse refs from a previous snapshot
-3. If a ref doesn't match, use `openclaw browser snapshot --labels` for a visual overlay
+| OpenClaw Command | Hermes MCP Tool |
+|------------------|-----------------|
+| `openclaw browser open` | `mcp_browser_navigate` |
+| `openclaw browser snapshot --interactive` | `mcp_browser_snapshot(full=false)` |
+| `openclaw browser find role button --name "X" click` | `mcp_browser_click(ref="@eN")` — find button ref in snapshot |
+| `openclaw browser key "Control+V"` | `mcp_browser_press(key="Control+V")` |
+| `openclaw browser find role textbox --name "X" fill "text"` | `mcp_browser_click` to focus + `mcp_browser_type` to enter text |
+
+## Agent Tips
+
+1. Always `mcp_browser_snapshot(full=false)` after navigation to get fresh refs
+2. Refs change on every page load — never reuse refs from a previous session
+3. If the consent dialog blocks interaction, press Enter first to dismiss it
 4. Verify each step using the **Verify** notes before proceeding
+5. The editor is often inside an iframe — click on the iframe area to focus it
 
 ---
-*Generated from live Screenpipe capture via Gemini analysis*
+*Adapted from OpenClaw Screenpipe capture for Hermes MCP browser tools*
