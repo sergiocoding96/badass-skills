@@ -1,11 +1,12 @@
 # badass-skills
 My collection of Claude Code / Hermes Agent skills.
-**11 skills** — synced automatically from `~/.hermes/skills/`
+**12 skills** — synced automatically from `~/.hermes/skills/`
 
 ## Skills
 
 | Skill | Category | Description |
 |-------|----------|-------------|
+| [csv-file-preview-function-development](./csv-file-preview-function-development/) | — | "How to create Python functions for previewing CSV files. Use when the user asks for CSV reading, data preview, inspecting file contents, printing first N rows, handling headers, converting rows to dictionaries, or processing large CSV files. Also trigger on requests for 'quick look at CSV data', 'see the structure of a CSV', 'read CSV without loading everything', 'CSV sample viewer', or any task involving extracting a subset of rows from a CSV file for inspection or debugging." |
 | [daily-tech-briefing](./daily-tech-briefing/) | research | Daily AI/Tech intelligence briefing — aggregates blogs, GitHub, YouTube, and X into a consolidated report delivered via Telegram |
 | [devops-github-cli-first](./devops-github-cli-first/) | — | Use gh CLI as first resort for GitHub data — commits, issues, PRs, repos. Only fall back to web_search/web_extract when gh can't do the job. |
 | [dogfood](./dogfood/) | — | "Exploratory QA of web apps: find bugs, evidence, reports." |
