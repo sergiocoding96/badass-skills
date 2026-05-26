@@ -69,15 +69,70 @@ notebooklm --help
 
 **IMPORTANT:** The built-in `notebooklm login` command and the Playwright-based login script both open a browser on the **remote server**, not on the user's local machine. This means in a headless/server environment, the browser will never be visible to the user and auth will fail silently or hang.
 
-**Two working paths — pick one:**
+**IMPORTANT — Auth model mismatch:** `notebooklm-py` uses **Google session cookies** (SID, HSID, APISID, SAPISID) stored in a Playwright `storage_state.json`. It does **NOT** accept OAuth2 access tokens or ID tokens — those are for Google REST APIs (Drive, Gmail, Calendar) and cannot authenticate the NotebookLM CLI. If you already have a `google_token.json` with OAuth tokens, they are useless for this skill — you still need browser-based Google sign-in.
 
-**Path A (recommended): Local auth + copy**  
-Run `notebooklm login` on your **local machine** (where the browser IS visible), then copy `~/.notebooklm/storage_state.json` to the server at `~/.notebooklm/storage_state.json`.
+**Three working paths — pick one:**
 
-**Path B: Google Cloud OAuth2**  
-Set up a Google Cloud project with NotebookLM API enabled, use `oauthlib` to get refresh tokens, and configure `notebooklm` with service account credentials. Requires Google Cloud setup but works on headless servers.
+**Path A (recommended): Local machine auth + copy**  
+Run `notebooklm login` on the user's **local machine** (where the browser IS visible), then copy `~/.notebooklm/profiles/default/storage_state.json` to the server at the same path.
 
-The Playwright browser-based login script (below) only works when running **on the same machine where the user can see the browser** — it is NOT a remote browser redirect. Do not attempt to use it in a headless/server environment.
+**Path B: Hermes browser interactive auth (headless server)**  \nOn a headless server, use the Hermes browser tool to navigate to notebooklm.google.com and complete Google sign-in interactively:
+
+Step 1 — Navigate and fill email
+```
+browser_navigate("https://notebooklm.google.com/")
+browser_type("@e1", "user@gmail.com")
+browser_click("@e4")  # Next
+```
+
+Step 2 — Enter password
+After clicking Next, wait for the "Hi [Name]" / "Enter your password" screen (check with browser_snapshot). Ask the user for the password — never guess it.
+```
+browser_type("@e2", "<password-from-user>")
+browser_click("@e4")  # Next
+```
+
+Step 3 — Navigate account recovery prompts
+On first sign-in from a new device, Google may show setup screens. These are not errors — skip through them:
+- Recovery phone: Click "Cancel" (@e4)
+- Home address: Click "Skip" (@e2)
+- Any other prompt: Look for "Skip" or "Cancel" buttons
+
+Step 4 — Verify
+After prompts clear, the browser reaches https://notebooklm.google.com/ — confirm via browser_snapshot (you should see "Create new notebook" and/or the NotebookLM logo).
+
+Step 5 — Save storage state for CLI
+The Hermes browser stores cookies in a Playwright temp profile (in-memory, no persistent Cookies DB file on disk). To save for the notebooklm CLI, either:
+
+Option A — Reuse temp profile (best when profile still exists):
+Find the temp profile path from `ps aux | grep playwright` (--user-data-dir=/tmp/playwright_chromiumdev_profile-*), then run a Python script with that profile to extract storage_state.
+
+Option B — Direct browser interaction (no CLI needed):
+Once authenticated in the Hermes browser, just use browser_navigate, browser_click, and browser_type to interact with NotebookLM directly. All major features (list notebooks, open notebooks, add sources, view content) are accessible via the web UI. CLI-only features (batch downloads, programmatic generation) won't be available.
+
+**Path C: Google Cloud OAuth2**  
+Set up a Google Cloud project with NotebookLM API enabled, use `oauthlib` to get refresh tokens, and configure `notebooklm` with service account credentials. Requires Google Cloud setup. Not tested.
+
+The Playwright browser-based login script (below) only works when running **on the same machine where the user can see the browser** — it is NOT a remote browser redirect. Do not attempt to use it in a headless/server environment unless you have Xvfb and can stream the display.
+
+### Pitfall: `--browser-cookies` on Linux
+
+The `notebooklm login --browser-cookies chrome` command fails on modern Linux with Chrome because cookies are encrypted with AES-256-CBC using a key stored in the system keyring (libsecret/gnome-keyring). `rookiepy` cannot decrypt them without access to that key. The database shows cookie values as encrypted blobs — SQLite queries confirm the `value` field is empty and `encrypted_value` contains 67-195 bytes per cookie. If this fails, fall back to Path A or B. Installing `browser-cookie3` gives a similar error (`Unable to get key for cookie decryption`). Do NOT retry the same command — switch auth paths.
+
+### Pitfall: OAuth token ≠ NotebookLM session
+
+If the user says "use the OAuth token" — clarify that NotebookLM uses browser cookies, not OAuth. The token works for Drive/Gmail/Calendar REST APIs but can't authenticate the `notebooklm-py` CLI. Direct API calls with `Authorization: Bearer <token>` to `notebooklm.google.com` endpoints return 405 or redirect to Google sign-in.
+
+### Pitfall: Hermes browser in-memory cookies (no Cookies DB)
+
+When using the Hermes browser tool for auth, the Playwright Chromium runs from a temp profile directory (`/tmp/playwright_chromiumdev_profile-*`). This profile has NO `Default/Cookies` SQLite file — cookies are stored entirely in memory, not on disk. Attempts to find a Cookies DB under the temp profile will fail (the directory exists but the `Default/` folder has only `Local Storage`, `Cache`, `History`, etc., no `Cookies`).
+
+This means:
+- `rookiepy`, `browser-cookie3`, and direct SQLite queries will ALL fail to find cookies — there's nothing to read
+- `document.cookie` in JS only returns non-HttpOnly cookies (missing `__Secure-3PSID`, `HSID`, `SSID` — the critical auth cookies)
+- Building `storage_state.json` from JS-visible cookies is insufficient for the CLI
+
+The only reliable way to save cookies for the CLI is Option A in Path B: use a Playwright Python script with the same temp profile path before it gets cleaned up. The user data dir persists as long as the Hermes browser session is alive (Hermes internally reuses the same Playwright context for all browser tool calls within a session).
 
 Tell the user:
 
