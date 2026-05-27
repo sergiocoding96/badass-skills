@@ -436,10 +436,10 @@ All generate commands support:
 |------|---------|---------|----------|
 | Podcast | `generate audio` | `--format [deep-dive\|brief\|critique\|debate]`, `--length [short\|default\|long]` | .mp3 |
 | Video | `generate video` | `--format [explainer\|brief]`, `--style [auto\|classic\|whiteboard\|kawaii\|anime\|watercolor\|retro-print\|heritage\|paper-craft]` | .mp4 |
-| Slide Deck | `generate slide-deck` | `--format [detailed\|presenter]`, `--length [default\|short]` | .pdf / .pptx |
+| Slide Deck | generate slide-deck | --format [detailed|presenter], --length [default|short], --append "instructions" (steers content -- frame around a specific project/angle) | .pdf / .pptx |
 | Slide Revision | `generate revise-slide "prompt" --artifact <id> --slide N` | `--wait`, `--notebook` | *(re-downloads parent deck)* |
 | Infographic | `generate infographic` | `--orientation [landscape\|portrait\|square]`, `--detail [concise\|standard\|detailed]` | .png |
-| Report | `generate report` | `--format [briefing-doc\|study-guide\|blog-post\|custom]`, `--append "extra instructions"` | .md |
+| Report | generate report | --format [briefing-doc|study-guide|blog-post|custom], --append "extra instructions" (steers content -- use this to frame around a specific project instead of letting the AI choose its focus) | .md |
 | Mind Map | `generate mind-map` | *(sync, instant)* | .json |
 | Data Table | `generate data-table` | description required | .csv |
 | Quiz | `generate quiz` | `--difficulty [easy\|medium\|hard]`, `--quantity [fewer\|standard\|more]` | .json/.md/.html |
@@ -465,6 +465,38 @@ All generate commands support:
    - Refresh token → new access token
    - `POST https://www.googleapis.com/drive/v3/files` to create folder if needed
    - Multipart upload to target folder
+
+### Research to Slide Deck
+
+When the user asks for a slide deck/presentation from web research:
+
+1. Create a notebook for the topic and set it as context:
+   ```bash
+   notebooklm create "Topic -- Market Intelligence"
+   notebooklm use <notebook_id>
+   ```
+
+2. Launch parallel deep research streams (one per dimension of the query):
+   ```bash
+   notebooklm source add-research "query 1" --mode deep --no-wait
+   notebooklm source add-research "query 2" --mode deep --no-wait
+   ```
+
+3. Monitor completion with `research status --json`. Avoid calling `research wait --import-all` twice on the same tasks -- it returns "Failed precondition" if already imported. Check `source list` instead.
+
+4. Generate the slide deck with detailed instructions via --append (batch ALL instructions here -- slide revisions have a ~9-per-day quota):
+   ```bash
+   notebooklm generate slide-deck --wait
+   ```
+   If `--wait` times out (slide decks take 5-10+ min), check `artifact list` for status and use `artifact wait <id>`.
+
+5. Download both formats:
+   ```bash
+   notebooklm download slide-deck ./slides.pdf
+   notebooklm download slide-deck ./slides.pptx --format pptx
+   ```
+
+6. Deliver files to the user. Note: MEDIA: syntax on Discord only handles images and audio -- for PDF/PPTX delivery, use Telegram (MEDIA: works there) or copy to a file hosting location.
 
 ### Document Analysis
 1. `notebooklm create "Analysis: [project]"`
@@ -549,5 +581,5 @@ When you need a formatted PDF briefing document from web research, NotebookLM + 
 
 - Audio, video, quiz, flashcard, infographic, and slide deck generation may fail due to Google rate limits
 - Slide revision (`revise-slide`) has a harder daily quota: ~9 revisions per session before being locked out for 1-24h. Batch corrections into the original `generate slide-deck` prompt when possible
-- Generation times: audio 10-20 min, video 15-45 min, quiz/flashcards 5-15 min, slide deck 2-5 min
+- Generation times: audio 10-20 min, video 15-45 min, quiz/flashcards 5-15 min, slide deck 5-10+ min (--wait often times out at 300s -- use `artifact list` + `artifact wait <id>` as fallback)
 - This is an unofficial API — Google can change things without warning
