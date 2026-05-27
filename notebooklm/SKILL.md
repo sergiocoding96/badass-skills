@@ -485,6 +485,55 @@ All generate commands support:
 {"artifacts": [{"id": "...", "title": "...", "type": "Audio Overview", "status": "in_progress|pending|completed|unknown"}]}
 ```
 
+## Common Workflows
+
+### Research-to-PDF Intelligence Briefing
+
+When you need a formatted PDF briefing document from web research, NotebookLM + weasyPrint produces professional results. This also serves as a **fallback when web_search/web_extract (Firecrawl) is down** — NotebookLM's built-in deep research engine works independently.
+
+**When to use this:** User asks for "deep research on [area] delivered as a PDF/NotebookLM PDF". Or when web_search fails repeatedly with Firecrawl errors — pivot here instead of reporting a blocker.
+
+1. Create a notebook for the topic:
+   ```bash
+   notebooklm create "Topic — Market Intelligence"
+   notebooklm use <notebook_id>
+   ```
+
+2. Launch parallel deep research streams covering each dimension of the query:
+   ```bash
+   notebooklm source add-research "research query 1" --mode deep --no-wait
+   notebooklm source add-research "research query 2" --mode deep --no-wait
+   ```
+
+3. Wait for all research to complete. Use `research status --json` to monitor — avoid repeated calls to `research wait --import-all` (see pitfall below):
+   ```bash
+   notebooklm research status --json
+   # Check all task statuses are "completed"
+   ```
+
+4. Import completed research to the notebook:
+   ```bash
+   notebooklm research wait --import-all
+   ```
+   If this returns `Failed precondition`, the tasks were already imported — check `notebooklm source list` to verify sources are present and proceed.
+
+5. Generate a briefing document:
+   ```bash
+   notebooklm generate report --format briefing-doc --wait
+   ```
+
+6. Download as markdown (NotebookLM reports are markdown-only):
+   ```bash
+   notebooklm download report ./report.md
+   ```
+
+7. Convert to styled PDF using weasyPrint (see `references/weasyprint-pdf-conversion.md`):
+   - Wrap the markdown content in a dark-themed HTML template
+   - Run `weasyprint input.html output.pdf`
+   - Deliver via `MEDIA:/path/to/output.pdf`
+
+**Key differences from web_search:** NotebookLM deep research returns richer, multi-source reports with embedded citations and often finds sources that web_search misses. However, it runs asynchronously (takes 1-3 min per query) vs web_search's instant results. Use NotebookLM for depth, web_search for speed.
+
 ## Error Handling
 
 | Error | Cause | Action |
@@ -494,6 +543,7 @@ All generate commands support:
 | Rate limiting (generation) | Google transient throttle | Wait 5-10 min, retry; `--retry N` works |
 | Rate limiting (slide revision) | Google daily quota exhausted | Stops working after ~9 revisions/session. `--retry N` burns retries with 60s/120s/240s backoff but won't resolve until quota resets (1-24h). Workaround: batch all slide edits into the original `generate slide-deck` prompt |
 | Download fails | Generation incomplete | Check `artifact list` for status |
+| `RPC [...] returned null result with status code 9 (Failed precondition)` | `research wait --import-all` retried on already-imported tasks | Check `source list` — sources are already present. Ignore the error or import individual tasks by ID. |
 
 ## Known Limitations
 
