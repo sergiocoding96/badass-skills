@@ -102,10 +102,23 @@ Step 4 — Verify
 After prompts clear, the browser reaches https://notebooklm.google.com/ — confirm via browser_snapshot (you should see "Create new notebook" and/or the NotebookLM logo).
 
 Step 5 — Save storage state for CLI
-The Hermes browser stores cookies in a Playwright temp profile (in-memory, no persistent Cookies DB file on disk). To save for the notebooklm CLI, either:
+The Hermes browser may use **Chromium** or **Firefox** as its Playwright engine. The cookie storage method differs by engine.
+
+**First, detect which engine is in use:**
+```bash
+ls /tmp/ | grep playwright_
+# playwright_chromiumdev_profile-*  → Chromium (cookies in memory)
+# playwright_firefoxdev_profile-*    → Firefox (cookies on disk)
+```
+
+**If Firefox (cookies on disk):**
+See `references/firefox-cookie-extraction.md` for the complete recipe. Cookies live in `/tmp/playwright_firefoxdev_profile-*/cookies.sqlite`, can be copied (DB is locked while Playwright runs), and converted to Playwright storage_state.json format.
+
+**If Chromium (cookies in memory):**
+The temp profile has a `Default/Cookies` SQLite file but it's typically empty (just schema, 0 rows). Cookies are truly in-memory. To save them:
 
 Option A — Reuse temp profile (best when profile still exists):
-Find the temp profile path from `ps aux | grep playwright` (--user-data-dir=/tmp/playwright_chromiumdev_profile-*), then run a Python script with that profile to extract storage_state.
+Find the temp profile path from `ps aux | grep playwright` (--user-data-dir=/tmp/playwright_chromiumdev_profile-*), then use a Playwright Python script with that profile to call `browser.storage_state()`.
 
 Option B — Direct browser interaction (no CLI needed):
 Once authenticated in the Hermes browser, just use browser_navigate, browser_click, and browser_type to interact with NotebookLM directly. All major features (list notebooks, open notebooks, add sources, view content) are accessible via the web UI. CLI-only features (batch downloads, programmatic generation) won't be available.
@@ -123,9 +136,34 @@ The `notebooklm login --browser-cookies chrome` command fails on modern Linux wi
 
 If the user says "use the OAuth token" — clarify that NotebookLM uses browser cookies, not OAuth. The token works for Drive/Gmail/Calendar REST APIs but can't authenticate the `notebooklm-py` CLI. Direct API calls with `Authorization: Bearer <token>` to `notebooklm.google.com` endpoints return 405 or redirect to Google sign-in.
 
-### Pitfall: Hermes browser in-memory cookies (no Cookies DB)
+### Pitfall: `notebooklm auth check` can falsely report ✓ pass with stale cookies
 
-When using the Hermes browser tool for auth, the Playwright Chromium runs from a temp profile directory (`/tmp/playwright_chromiumdev_profile-*`). This profile has NO `Default/Cookies` SQLite file — cookies are stored entirely in memory, not on disk. Attempts to find a Cookies DB under the temp profile will fail (the directory exists but the `Default/` folder has only `Local Storage`, `Cache`, `History`, etc., no `Cookies`).
+`notebooklm auth check` only validates that the `storage_state.json` file exists, is valid JSON, and contains an SID cookie with the right name. It does NOT verify the cookie is still valid with Google's servers. You can get ✓ pass on all checks and still fail on the next API call.
+
+**Always verify auth with a real API call** before proceeding:
+```bash
+notebooklm list
+```
+If this returns an `Authentication expired` error with a redirect URL, the cookies are stale even if `auth check` passed. Re-run `notebooklm login`.
+
+The error message to look for:
+```
+Authentication expired or invalid. Redirected to: https://accounts.google.com/v3/signin/...
+```
+
+### Pitfall: Hermes browser may use Firefox (not Chromium) — cookies persist to disk
+
+The existing pitfall below assumes Hermes browser always uses Playwright Chromium. On some systems, Hermes uses **Firefox** instead. Check with:
+```bash
+ls /tmp/ | grep playwright_firefox
+```
+
+When Firefox is used, cookies ARE stored on disk — see `references/firefox-cookie-extraction.md` for the full extraction workflow.
+When Chromium is used (the default assumption below), cookies are in-memory only.
+
+### Pitfall: Hermes browser in-memory cookies (Chromium only)
+
+When using the Hermes browser tool for auth with Playwright Chromium, cookies are stored in memory, not on disk. Attempts to find a Cookies DB under the temp profile will fail (the `Default/` folder has only `Local Storage`, `Cache`, `History`, etc., no `Cookies`).
 
 This means:
 - `rookiepy`, `browser-cookie3`, and direct SQLite queries will ALL fail to find cookies — there's nothing to read
@@ -417,6 +455,17 @@ All generate commands support:
 5. Check `notebooklm artifact list` for status
 6. `notebooklm download audio ./podcast.mp3` when complete
 
+### Slide Deck to Google Drive
+1. `notebooklm create "Presentation: [topic]"`
+2. `notebooklm source add ./source.md` (or URLs)
+3. Wait for source: `notebooklm source wait <source_id>`
+4. `notebooklm generate slide-deck "Detailed instructions — include ALL desired slide wording here to avoid needing revisions later due to rate limits" --format presenter --wait`
+5. `notebooklm download slide-deck ./deck.pptx --format pptx`
+6. Upload to Drive via OAuth (uses google_token.json refresh token + client_secret.json):
+   - Refresh token → new access token
+   - `POST https://www.googleapis.com/drive/v3/files` to create folder if needed
+   - Multipart upload to target folder
+
 ### Document Analysis
 1. `notebooklm create "Analysis: [project]"`
 2. `notebooklm source add ./doc.pdf` (or URLs)
@@ -442,11 +491,13 @@ All generate commands support:
 |-------|-------|--------|
 | Auth/cookie error | Session expired | Re-run `notebooklm login` |
 | "No notebook context" | Context not set | Run `notebooklm use <id>` |
-| Rate limiting | Google throttle | Wait 5-10 min, retry |
+| Rate limiting (generation) | Google transient throttle | Wait 5-10 min, retry; `--retry N` works |
+| Rate limiting (slide revision) | Google daily quota exhausted | Stops working after ~9 revisions/session. `--retry N` burns retries with 60s/120s/240s backoff but won't resolve until quota resets (1-24h). Workaround: batch all slide edits into the original `generate slide-deck` prompt |
 | Download fails | Generation incomplete | Check `artifact list` for status |
 
 ## Known Limitations
 
 - Audio, video, quiz, flashcard, infographic, and slide deck generation may fail due to Google rate limits
-- Generation times: audio 10-20 min, video 15-45 min, quiz/flashcards 5-15 min
+- Slide revision (`revise-slide`) has a harder daily quota: ~9 revisions per session before being locked out for 1-24h. Batch corrections into the original `generate slide-deck` prompt when possible
+- Generation times: audio 10-20 min, video 15-45 min, quiz/flashcards 5-15 min, slide deck 2-5 min
 - This is an unofficial API — Google can change things without warning
