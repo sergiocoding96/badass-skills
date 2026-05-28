@@ -496,28 +496,24 @@ When the user asks for a slide deck/presentation from web research:
    notebooklm download slide-deck ./slides.pptx --format pptx
    ```
 
-6. Deliver files to the user. Note: MEDIA: syntax on Discord only handles images and audio -- for PDF/PPTX delivery, use Telegram (MEDIA: works there) or copy to a file hosting location.
+6. Deliver files to the user. Note: MEDIA: syntax on Discord only handles images (.png, .jpg, .webp) and audio — for PDF/PPTX delivery, use Telegram (MEDIA: works there for all file types) or copy to a file hosting location.
+
+### Fallback: Report → PPTX (when slide deck quota exhausted)
+
+When the initial slide deck daily quota is hit (error: "Slide Deck generation rate limited by Google" at ~0.3s with `--retry` backoffs failing), NotebookLM reports still work:
+
+1. Generate a detailed briefing report instead: `notebooklm generate report --format briefing-doc "detailed instructions" --wait`
+2. Download as markdown: `notebooklm download report ./report.md`
+3. Convert to PPTX programmatically — pptxgenjs (set `NODE_PATH=/home/linuxbrew/.linuxbrew/lib/node_modules`, dark theme bg:1A1A2E accent:E94560) or python-pptx.
+4. Deliver via `MEDIA:/path/to/output.pptx`
+
+**When to use:** After a quota error on `generate slide-deck` that wasn't the first deck. EXPLAIN the rate limit to the user before switching.
 
 ### Document Analysis
 1. `notebooklm create "Analysis: [project]"`
 2. `notebooklm source add ./doc.pdf` (or URLs)
 3. `notebooklm ask "Summarize the key points"`
 4. Continue chatting as needed
-
-## Output Formats (--json)
-
-```json
-// notebooklm list --json
-{"notebooks": [{"id": "...", "title": "...", "created_at": "..."}]}
-
-// notebooklm source list --json
-{"sources": [{"id": "...", "title": "...", "status": "ready|processing|error"}]}
-
-// notebooklm artifact list --json
-{"artifacts": [{"id": "...", "title": "...", "type": "Audio Overview", "status": "in_progress|pending|completed|unknown"}]}
-```
-
-## Common Workflows
 
 ### Research-to-PDF Intelligence Briefing
 
@@ -566,6 +562,19 @@ When you need a formatted PDF briefing document from web research, NotebookLM + 
 
 **Key differences from web_search:** NotebookLM deep research returns richer, multi-source reports with embedded citations and often finds sources that web_search misses. However, it runs asynchronously (takes 1-3 min per query) vs web_search's instant results. Use NotebookLM for depth, web_search for speed.
 
+## Output Formats (--json)
+
+```json
+// notebooklm list --json
+{"notebooks": [{"id": "...", "title": "...", "created_at": "..."}]}
+
+// notebooklm source list --json
+{"sources": [{"id": "...", "title": "...", "status": "ready|processing|error"}]}
+
+// notebooklm artifact list --json
+{"artifacts": [{"id": "...", "title": "...", "type": "Audio Overview", "status": "in_progress|pending|completed|unknown"}]}
+```
+
 ## Error Handling
 
 | Error | Cause | Action |
@@ -573,9 +582,10 @@ When you need a formatted PDF briefing document from web research, NotebookLM + 
 | Auth/cookie error | Session expired | Re-run `notebooklm login` |
 | "No notebook context" | Context not set | Run `notebooklm use <id>` |
 | Rate limiting (generation) | Google transient throttle | Wait 5-10 min, retry; `--retry N` works |
-| Rate limiting (slide revision) | Google daily quota exhausted | Stops working after ~9 revisions/session. `--retry N` burns retries with 60s/120s/240s backoff but won't resolve until quota resets (1-24h). Workaround: batch all slide edits into the original `generate slide-deck` prompt |
+| Rate limiting (slide deck generation) | Google daily quota (separate from revisions) | Initial slide deck generation has ~1-2 per day quota per notebook. If the first succeeds and a second attempt fails at 0.4s with \"Slide Deck generation rate limited\", the daily quota is exhausted. `--retry N` waits 60s/120s/240s but won't bypass it. Workaround: if you need a second deck from the same notebook, use pptxgenjs or python-pptx as a fallback — but EXPLAIN the rate limit to the user first. |
 | Download fails | Generation incomplete | Check `artifact list` for status |
 | `RPC [...] returned null result with status code 9 (Failed precondition)` | `research wait --import-all` retried on already-imported tasks | Check `source list` — sources are already present. Ignore the error or import individual tasks by ID. |
+| Slide deck --wait times out (>300s) | Generation takes longer than default | Don't retry `generate slide-deck --wait` — the generation is still running server-side. Use `artifact list --json`, find the in_progress artifact ID, then `artifact wait <id>` to block until completion. |
 
 ## Known Limitations
 
