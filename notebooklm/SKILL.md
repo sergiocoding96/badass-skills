@@ -436,7 +436,7 @@ All generate commands support:
 |------|---------|---------|----------|
 | Podcast | `generate audio` | `--format [deep-dive\|brief\|critique\|debate]`, `--length [short\|default\|long]` | .mp3 |
 | Video | `generate video` | `--format [explainer\|brief]`, `--style [auto\|classic\|whiteboard\|kawaii\|anime\|watercolor\|retro-print\|heritage\|paper-craft]` | .mp4 |
-| Slide Deck | generate slide-deck | --format [detailed|presenter], --length [default|short], --append "instructions" (steers content -- frame around a specific project/angle) | .pdf / .pptx |
+| Slide Deck | generate slide-deck | --format [detailed|presenter], --length [default|short] | .pdf / .pptx |
 | Slide Revision | `generate revise-slide "prompt" --artifact <id> --slide N` | `--wait`, `--notebook` | *(re-downloads parent deck)* |
 | Infographic | `generate infographic` | `--orientation [landscape\|portrait\|square]`, `--detail [concise\|standard\|detailed]` | .png |
 | Report | generate report | --format [briefing-doc|study-guide|blog-post|custom], --append "extra instructions" (steers content -- use this to frame around a specific project instead of letting the AI choose its focus) | .md |
@@ -484,9 +484,9 @@ When the user asks for a slide deck/presentation from web research:
 
 3. Monitor completion with `research status --json`. Avoid calling `research wait --import-all` twice on the same tasks -- it returns "Failed precondition" if already imported. Check `source list` instead.
 
-4. Generate the slide deck with detailed instructions via --append (batch ALL instructions here -- slide revisions have a ~9-per-day quota):
+4. Generate the slide deck passing detailed instructions as the DESCRIPTION positional argument (batch ALL instructions here -- slide revisions have a ~9-per-day quota):
    ```bash
-   notebooklm generate slide-deck --wait
+   notebooklm generate slide-deck "Your full detailed instructions with slide-by-slide outline here" --wait
    ```
    If `--wait` times out (slide decks take 5-10+ min), check `artifact list` for status and use `artifact wait <id>`.
 
@@ -497,6 +497,8 @@ When the user asks for a slide deck/presentation from web research:
    ```
 
 6. Deliver files to the user. Note: MEDIA: syntax on Discord only handles images (.png, .jpg, .webp) and audio — for PDF/PPTX delivery, use Telegram (MEDIA: works there for all file types) or copy to a file hosting location.
+
+**Voice memo → Slide deck variant:** For audio recaps/voice memos, see `references/voice-memo-to-slide-deck.md` for the full pipeline (transcribe → structure → notebook → generate → download).
 
 ### Fallback: Report → PPTX (when slide deck quota exhausted)
 
