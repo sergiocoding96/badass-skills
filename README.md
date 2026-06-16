@@ -1,6 +1,6 @@
 # badass-skills
 My collection of Claude Code / Hermes Agent skills.
-**12 skills** — synced automatically from `~/.hermes/skills/`
+**13 skills** — synced automatically from `~/.hermes/skills/`
 
 ## Skills
 
@@ -11,6 +11,7 @@ My collection of Claude Code / Hermes Agent skills.
 | [devops-github-cli-first](./devops-github-cli-first/) | — | Use gh CLI as first resort for GitHub data — commits, issues, PRs, repos. Only fall back to web_search/web_extract when gh can't do the job. |
 | [dogfood](./dogfood/) | — | "Exploratory QA of web apps: find bugs, evidence, reports." |
 | [gemini-video](./gemini-video/) | — | Download a video from a Vimeo (or YouTube) URL and analyze it with Google Gemini's multimodal vision. Returns a structured analysis covering content summary, key moments, speakers, and custom insights. |
+| [github](./github/) | — | "One stop for every GitHub operation: auth, issues, PRs, code review, repo management, CI/CD, releases, secrets, and Actions. Merges github-auth, github-code-review, github-issues, github-pr-workflow, and github-repo-management." |
 | [hermes-devops](./hermes-devops/) | devops | Complete Hermes infrastructure operations — disk space recovery, emergency cleanup, Firecrawl recovery, web stack setup, system health checks, and Tailscale funnel management. Use when disk is critically full (≥95%), services are unreachable, or diagnosing infrastructure failures. |
 | [hermes-mlops-inference](./hermes-mlops-inference/) | mlops/inference | Complete LLM inference workflows — serving with vLLM, GGUF quantization for CPU/GPU, structured output with Outlines and Guidance, and model surgery (ablation/removal of refusal layers). Use when serving LLMs, quantizing models, or extracting/ablating model layers. |
 | [hermes-mlops-training](./hermes-mlops-training/) | mlops/training | Complete LLM fine-tuning and training workflows for Hermes — LoRA/QLoRA via axolotl, RL training via TRL (GRPO/DPO/SFTTrainer), distributed training via PyTorch FSDP, and fast fine-tuning via Unsloth. Use when fine-tuning an LLM, setting up RLHF training, or configuring distributed training infrastructure. |
