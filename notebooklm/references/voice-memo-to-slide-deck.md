@@ -1,6 +1,6 @@
-# Voice Memo → NotebookLM Slide Deck Pipeline
+# Voice Memo → NotebookLM Multi-Format Presentation Pipeline
 
-Convert an audio voice memo (recap, team sync, client update) into a structured NotebookLM slide deck.
+Convert an audio voice memo (recap, team sync, client update, strategy session) into a structured NotebookLM multi-format presentation: slide deck + briefing report + audio podcast.
 
 ## Workflow
 
@@ -43,40 +43,72 @@ notebooklm source add ./memory/YYYY-MM-DD.md
 notebooklm source wait <source_id>
 ```
 
-### Step 4: Generate Slide Deck
+### Step 4: Multi-Artifact Generation (Recommended)
 
-Pass ALL instructions as the DESCRIPTION positional argument (not `--append` — that flag doesn't exist for `generate slide-deck`):
+Generate multiple artifact types from the same source for a comprehensive output. All can run in parallel — NotebookLM handles concurrent generation of different artifact types from the same notebook.
 
 ```bash
+# All three can fire immediately — they run independently
 notebooklm generate slide-deck \
   --format detailed \
   "Create a comprehensive presentation covering: [slide-by-slide outline with all key content, celebrations, action items]"
+
+notebooklm generate report \
+  --format briefing-doc \
+  "Create a comprehensive briefing document covering: [key topics, decisions, team tasks, action items]"
+
+notebooklm generate audio \
+  "[instructions for podcast tone and content — e.g. energetic team huddle, focused strategy session, client update]"
 ```
+
+All three return artifact IDs immediately. Track and wait on each:
+
+```bash
+# Check all artifacts
+notebooklm artifact list --json
+
+# Wait for each (they complete at different speeds: report fastest, then slide deck, then audio slowest)
+notebooklm artifact wait <report_id>
+notebooklm artifact wait <slide_deck_id>
+notebooklm artifact wait <audio_id>
+```
+
+**Timing expectations from real runs:**
+- **Briefing report**: ~2-5 min (fastest)
+- **Slide deck**: ~5-10 min
+- **Audio podcast**: ~8-20 min (may transition through "pending" status — this is Google's queue, wait continues)
+- **Video explainer**: ~15-45 min (slowest)
 
 ### Step 5: Handle `--wait` Timeout
 
-`--wait` times out at 300s for slide decks. The generation continues server-side. Check with:
+`--wait` times out at 300s for slide decks. **Don't use `--wait` for slide-deck generation** — it always times out. Instead launch without `--wait` (returns artifact ID immediately) and poll with `artifact wait`:
 
-```bash
-notebooklm artifact list --json
-# Find the artifact ID with status "completed"
-notebooklm artifact wait <artifact_id>
-```
-
-Alternatively, skip `--wait` entirely and poll manually:
 ```bash
 notebooklm generate slide-deck "instructions"  # Returns artifact ID immediately
+notebooklm artifact list --json                 # Check status
 notebooklm artifact wait <id>                   # Blocks until completion
 ```
 
-### Step 6: Download
+This pattern also works for audio (podcasts) — `--wait` will also time out at 300s on audio, but `artifact wait` will properly wait for the full 10-20 min.
+
+### Step 6: Download All Artifacts
 
 ```bash
+# Slide deck — download both formats
 notebooklm download slide-deck ./output.pptx --format pptx
 notebooklm download slide-deck ./output.pdf
+
+# Briefing report
+notebooklm download report ./output.md
+
+# Audio podcast
+notebooklm download audio ./output.mp3
+
+# Video (if generated)
+notebooklm download video ./output.mp4
 ```
 
-Deliver via `MEDIA:/path/to/output.pptx` and `MEDIA:/path/to/output.pdf`.
+Deliver via `MEDIA:/path/to/output.pptx`, `MEDIA:/path/to/output.pdf`, `MEDIA:/path/to/output.mp3`, etc. Telegram handles all file types natively.
 
 ## Pitfalls
 
@@ -84,3 +116,6 @@ Deliver via `MEDIA:/path/to/output.pptx` and `MEDIA:/path/to/output.pdf`.
 - **`generate slide-deck` without description may fail** with `"no artifact_id returned"` if NotebookLM can't determine what to generate. Always include a description/instructions.
 - **`--wait` times out at 300s** — the generation is still running server-side. Use `artifact list` + `artifact wait <id>` to check completion.
 - **Daily quota**: ~1-2 slide decks per notebook per day. Batch all instructions into one generation to avoid needing quota-costly slide revisions.
+- **Audio can show "pending" status**: Unlike reports and slide decks which go straight to "in_progress", audio podcast generation may enter a "pending" queue state (status_id: 2) before transitioning to "in_progress" (1) → "completed" (3). This is normal — `artifact wait <id>` handles it correctly, just takes longer (~8-20 min total). Don't retry if it shows "pending".
+- **audio `--wait` also times out at 300s**: Same as slide decks. Launch without `--wait`, record the artifact ID, use `artifact wait <id>` to block until full completion.
+- **Slide deck title may differ from notebook title**: NotebookLM may auto-title the slide deck artifact differently from the notebook title (e.g. notebook titled "Team Strategy" produces deck titled "AI Real Estate Blueprint"). Don't rely on artifact title matching — use the artifact ID from the generate response.

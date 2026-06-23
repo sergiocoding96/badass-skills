@@ -447,13 +447,19 @@ All generate commands support:
 
 ## Common Workflows
 
+### Multi-Artifact Presentation from Single Source
+
+When a user provides raw content (voice memo, transcript, notes), generate a comprehensive multi-format output:
+
+1. **Write a structured Markdown source file** with clear sections — this becomes the notebook source
+2. **Create notebook → add source → wait for processing**
+3. **Fire slide deck, briefing report, and audio podcast simultaneously** (they run in parallel)
+4. **Don't use `--wait`** on any of them — launch without it and use `artifact wait <id>` for each
+5. **Download all formats** and deliver via `MEDIA:` paths
+
+See `references/voice-memo-to-slide-deck.md` for the full pipeline including multi-artifact timing expectations and the "raw transcript → structured source" technique.
+
 ### Research to Podcast
-1. `notebooklm create "Research: [topic]"`
-2. `notebooklm source add` for each URL/document
-3. Wait for sources: `notebooklm source list --json` until all status=READY
-4. `notebooklm generate audio "Focus on [specific angle]"`
-5. Check `notebooklm artifact list` for status
-6. `notebooklm download audio ./podcast.mp3` when complete
 
 ### Slide Deck to Google Drive
 1. `notebooklm create "Presentation: [topic]"`
