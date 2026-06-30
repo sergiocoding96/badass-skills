@@ -593,7 +593,7 @@ When you need a formatted PDF briefing document from web research, NotebookLM + 
 | Rate limiting (slide deck generation) | Google daily quota (separate from revisions) | Initial slide deck generation has ~1-2 per day quota per notebook. If the first succeeds and a second attempt fails at 0.4s with \"Slide Deck generation rate limited\", the daily quota is exhausted. `--retry N` waits 60s/120s/240s but won't bypass it. Workaround: if you need a second deck from the same notebook, use pptxgenjs or python-pptx as a fallback — but EXPLAIN the rate limit to the user first. |
 | Download fails | Generation incomplete | Check `artifact list` for status |
 | `RPC [...] returned null result with status code 9 (Failed precondition)` | `research wait --import-all` retried on already-imported tasks | Check `source list` — sources are already present. Ignore the error or import individual tasks by ID. |
-| Slide deck --wait times out (>300s) | Generation takes longer than default | Don't retry `generate slide-deck --wait` — the generation is still running server-side. Use `artifact list --json`, find the in_progress artifact ID, then `artifact wait <id>` to block until completion. |
+| Slide deck --wait times out (>300s) | Generation takes longer than default timeout | Don't retry `generate slide-deck --wait` — the generation is still running server-side. Use `artifact list --json`, find the in_progress artifact ID, then `artifact wait <id>` to block until completion. **Alternatively: just run `download slide-deck` directly** — even if `--wait` timed out, the server-side generation may have completed. The `download` will succeed if the artifact is ready, or block briefly if still generating. This avoids the 300s CLI timeout entirely. |
 
 ## Known Limitations
 
